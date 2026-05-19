@@ -1,0 +1,74 @@
+name: Freebuff SSH Shell (24/7)
+
+on:
+  workflow_dispatch:  # Manual trigger — click "Run workflow" in the Actions tab
+  schedule:
+    # Restart every 6 hours to keep it alive around the clock.
+    # GitHub-hosted runners max out at 6 hours per job.
+    - cron: '0 */6 * * *'
+
+# Prevent overlapping runs — when a scheduled run kicks off, the previous one is
+# cancelled so there's minimal gap between sessions.
+concurrency:
+  group: ssh-shell
+  cancel-in-progress: true
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  NOTE: GitHub ToS consideration                             ║
+# ║  GitHub Actions is intended for CI/CD, not as a 24/7 VPS.   ║
+# ║  Long-running SSH sessions (tmate) may violate ToS.         ║
+# ║  Use this responsibly — it's a convenience, not a guarantee. ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+jobs:
+  ssh-shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours — max for GitHub-hosted runners
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show system info
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Freebuff Shell — System Information"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Hostname : $(hostname)"
+          echo "OS       : $(uname -a)"
+          echo "Uptime   : $(uptime -p)"
+          echo "CPU      : $(nproc) cores"
+          echo "Memory   : $(free -h | awk '/^Mem:/ {print $2}')"
+          echo "Disk     : $(df -h / | awk 'NR==2 {print $4}') free"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "→ Find the SSH connection string in the logs of"
+          echo "  the 'Setup tmate SSH session' step below."
+          echo ""
+
+      - name: Setup tmate SSH session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          # Only the user who triggered the workflow can connect (via GitHub auth)
+          limit-access-to-actor: true
+          # No inactivity timeout — the 6h job timeout is the only limit
+          timeout-seconds: 0
+
+      - name: Session ended
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  tmate session ended."
+          echo ""
+          echo "  What to do next:"
+          echo "  ┌────────────────────────────────────────┐"
+          echo "  │ Go to GitHub → Actions → Find the      │"
+          echo "  │ latest 'Freebuff SSH Shell' run →       │"
+          echo "  │ Click 'ssh-shell' job → Look for the    │
+          echo "  │ 'Setup tmate SSH session' step to find  │
+          echo "  │ your new SSH connection string.         │"
+          echo "  └────────────────────────────────────────┘"
+          echo ""
+          echo "  The next scheduled session will start"
+          echo "  automatically within 6 hours."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
